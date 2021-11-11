@@ -5,16 +5,24 @@
     <div class="row">
       <label>
         Фамилия
-        <input id="surname" placeholder="Фамилия" v-model="formData.surname" />
+        <input
+          :class="{ error: validationErrors.surname }"
+          placeholder="Фамилия"
+          v-model="formData.surname"
+        />
       </label>
       <label>
         Имя
-        <input id="name" placeholder="Имя" v-model="formData.name" />
+        <input
+          :class="{ error: validationErrors.name }"
+          placeholder="Имя"
+          v-model="formData.name"
+        />
       </label>
       <label>
         Отчество
         <input
-          id="middleName"
+          :class="{ error: validationErrors.middleName }"
           placeholder="Отчество"
           v-model="formData.middleName"
         />
@@ -25,7 +33,7 @@
       <label>
         Дата рождения
         <input
-          id="birthDate"
+          :class="{ error: validationErrors.birthDate }"
           placeholder="дд.мм.гггг"
           v-model="formData.birthDate"
         />
@@ -36,7 +44,7 @@
       <label>
         E-mail
         <input
-          id="email"
+          :class="{ error: validationErrors.email }"
           placeholder="example@example.ru"
           v-model="formData.email"
         />
@@ -67,30 +75,37 @@
 
     <h2>Паспортные данные</h2>
 
-    <div class="row">
+    <div class="row citizenship" v-click-outside="hideDropdown">
       <label>
         Гражданство
-        <select
+        <input
           name="citizenship"
           id="citizenship"
           v-model="formData.citizenship"
-        >
-          <option
-            v-for="citizenship of citizenships"
-            :key="citizenship.uid"
-            v-bind:value="citizenship.nationality"
-          >
-            {{ citizenship.nationality }}
-          </option>
-        </select>
+          @focus="citizenshipDropdownOpened = true"
+        />
       </label>
+      <span class="clearInput" @click="onClearInput">X</span>
+      <div class="dropdown" v-show="citizenshipDropdownOpened">
+        <ul>
+          <li
+            v-for="country of countrySearchResults"
+            :key="country.uid"
+            v-bind:value="country.nationality"
+            @click="onSelectCitizenship(country.nationality)"
+          >
+            {{ country.flag }}
+            {{ country.nationality }}
+          </li>
+        </ul>
+      </div>
     </div>
 
-    <div class="row" v-show="formData.citizenship !== 'Russia'">
+    <div class="row" v-show="!isRussianCitizen">
       <label>
         Фамилия на латинице
         <input
-          id="surnameInLatin"
+          :class="{ error: validationErrors.surnameInLatin }"
           placeholder="Фамилия"
           v-model="formData.surnameInLatin"
         />
@@ -98,7 +113,7 @@
       <label>
         Имя на латинице
         <input
-          id="nameInLatin"
+          :class="{ error: validationErrors.nameInLatin }"
           placeholder="Имя"
           v-model="formData.nameInLatin"
         />
@@ -106,10 +121,10 @@
     </div>
 
     <div class="row">
-      <label v-show="formData.citizenship === 'Russia'">
+      <label v-show="isRussianCitizen">
         Серия паспорта
         <input
-          id="passportSeries"
+          :class="{ error: validationErrors.passportSeries }"
           placeholder="1234"
           v-model="formData.passportSeries"
         />
@@ -117,28 +132,24 @@
       <label>
         Номер паспорта
         <input
-          id="passportNumber"
+          :class="{ error: validationErrors.passportNumber }"
           placeholder="123456"
           v-model="formData.passportNumber"
         />
       </label>
-      <label v-show="formData.citizenship === 'Russia'">
+      <label v-show="isRussianCitizen">
         Дата выдачи
         <input
-          id="passportDate"
+          :class="{ error: validationErrors.passportDate }"
           placeholder="дд.мм.гггг"
           v-model="formData.passportDate"
         />
       </label>
-      <label v-show="formData.citizenship !== 'Russia'">
+      <label v-show="!isRussianCitizen">
         Страна выдачи
-        <select
-          name="passportCountry"
-          id="passportCountry"
-          v-model="formData.passportCountry"
-        >
+        <select name="passportCountry" v-model="formData.passportCountry">
           <option
-            v-for="country of citizenships"
+            v-for="country of countries"
             :key="country.uid"
             v-bind:value="country.nationality"
           >
@@ -146,13 +157,9 @@
           </option>
         </select>
       </label>
-      <label v-show="formData.citizenship !== 'Russia'">
+      <label v-show="!isRussianCitizen">
         Тип паспорта
-        <select
-          name="passportType"
-          id="passportType"
-          v-model="formData.passportType"
-        >
+        <select name="passportType" v-model="formData.passportType">
           <option
             v-for="pass of passportTypes"
             :key="pass.id"
@@ -190,7 +197,7 @@
       <label>
         Предыдущая фамилия
         <input
-          id="previousSurname"
+          :class="{ error: validationErrors.previousSurname }"
           placeholder="Фамилия"
           v-model="formData.previousSurname"
         />
@@ -198,7 +205,7 @@
       <label>
         Предыдущее имя
         <input
-          id="previousName"
+          :class="{ error: validationErrors.previousName }"
           placeholder="Имя"
           v-model="formData.previousName"
         />
@@ -211,8 +218,13 @@
 </template>
 
 <script>
+import { russiaUid } from "@/constants";
 import passportTypes from "../assets/data/passport-types.json";
-import citizenships from "../assets/data/citizenships.json";
+import countries from "../assets/data/citizenships.json";
+import clickOutside from "@/directives/clickOutside";
+import debounce from "@/utils/debounce";
+import validators from "@/validators";
+
 export default {
   data() {
     return {
@@ -229,25 +241,126 @@ export default {
         email: "",
         gender: "male",
         citizenship: "",
-        passportSeries: null,
-        passportNumber: null,
-        passportDate: null,
+        passportSeries: "",
+        passportNumber: "",
+        passportDate: "",
         passportType: "",
         passportCountry: "",
       },
       passportTypes: [],
-      citizenships: [],
+      countries: [],
+      citizenship: null,
+      citizenshipDropdownOpened: false,
+      countrySearchResults: [],
+      validationErrors: {},
     };
+  },
+  directives: {
+    clickOutside,
+  },
+  computed: {
+    isRussianCitizen: function () {
+      return this.citizenship && this.citizenship.uid === russiaUid;
+    },
   },
   methods: {
     onSubmit: function () {
+      this.validateForm();
       console.log(JSON.stringify(this.formData, null, "\t"));
+    },
+    validateForm: function () {
+      this.validateErrors();
+      // reset validation on form update
+      this.unwatch = this.$watch(
+        "formData",
+        function () {
+          this.validationErrors = {};
+          this.unwatch && this.unwatch();
+        },
+        { deep: true }
+      );
+    },
+    hideDropdown: function () {
+      this.citizenshipDropdownOpened = false;
+    },
+    onSelectCitizenship: function (country) {
+      this.formData.citizenship = country;
+      this.citizenshipDropdownOpened = false;
+    },
+    onClearInput: function () {
+      this.formData.citizenship = "";
+      this.citizenshipDropdownOpened = true;
+    },
+    updateCitizenship: function (citizenshipValue) {
+      const citizenship = this.countries.find(
+        (country) => country.nationality === citizenshipValue
+      );
+      if (citizenship) this.citizenship = citizenship;
+    },
+    updateCountrySearchResults: function (citizenshipValue) {
+      if (!citizenshipValue) this.countrySearchResults = this.countries;
+      const query = citizenshipValue.toLowerCase();
+      this.countrySearchResults = this.countries.filter((country) =>
+        country.nationality.toLowerCase().includes(query)
+      );
+    },
+    validateErrors: function () {
+      let validationResult = ["name", "surname", "middleName"].map((input) => [
+        input,
+        !validators.russianLetters(this.formData[input]),
+      ]);
+      if (this.formData.nameIsChanged) {
+        validationResult = validationResult.concat(
+          ["previousSurname", "previousName"].map((input) => [
+            input,
+            !validators.russianLetters(this.formData[input]),
+          ])
+        );
+      }
+      validationResult.push([
+        "birthDate",
+        !validators.date(this.formData.birthDate),
+      ]);
+      validationResult.push(["email", !validators.email(this.formData.email)]);
+      if (this.isRussianCitizen) {
+        validationResult = validationResult.concat([
+          [
+            "passportSeries",
+            !validators.passportSeries(this.formData.passportSeries),
+          ],
+          [
+            "passportNumber",
+            !validators.passportNumberRu(this.formData.passportNumber),
+          ],
+        ]);
+      } else {
+        validationResult.push([
+          "passportNumber",
+          !validators.passportNumber(this.formData.passportNumber),
+        ]);
+        validationResult = validationResult.concat(
+          ["nameInLatin", "surnameInLatin"].map((input) => [
+            input,
+            !validators.englishLetters(this.formData[input]),
+          ])
+        );
+      }
+      this.validationErrors = Object.fromEntries(validationResult);
     },
   },
   created() {
     this.passportTypes = passportTypes;
-    this.citizenships = citizenships;
-    this.formData.citizenship = citizenships[0].nationality;
+    this.countries = countries;
+    this.formData.citizenship = countries[0].nationality;
+  },
+  watch: {
+    "formData.citizenship": {
+      handler: debounce(function (citizenshipValue) {
+        this.updateCitizenship(citizenshipValue);
+        this.updateCountrySearchResults(citizenshipValue);
+      }, 500),
+      immediate: true,
+    },
   },
 };
 </script>
@@ -311,5 +424,49 @@ select {
   height: 36px;
   border-radius: 5px;
   outline: none;
+}
+
+input#citizenship {
+  width: 250px;
+}
+.dropdown {
+  position: relative;
+}
+
+ul {
+  width: 250px;
+  height: 200px;
+  position: absolute;
+  overflow: auto;
+  background: #fff;
+  margin: 0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 5px;
+}
+li {
+  list-style-type: none;
+  padding: 5px 20px;
+}
+li:hover {
+  background: #e8f1f9;
+  cursor: pointer;
+}
+.clearInput {
+  height: 20px;
+  position: absolute;
+  color: #666;
+  cursor: pointer;
+  bottom: 0;
+  display: block;
+  left: 230px;
+  top: 30px;
+}
+.citizenship {
+  position: relative;
+}
+
+label input.error {
+  border: 2px solid red;
 }
 </style>
