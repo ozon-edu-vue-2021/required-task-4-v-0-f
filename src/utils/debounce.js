@@ -8,6 +8,6 @@ export default function debounce(func, timeout) {
       func.apply(this, args); // leading
     }
     clearTimeout(timerId);
-    timerId = setTimeout( () => func.apply(this, args), timeout);
+    timerId = setTimeout(() => func.apply(this, args), timeout);
   };
 }

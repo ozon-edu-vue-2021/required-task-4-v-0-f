@@ -218,7 +218,7 @@
 </template>
 
 <script>
-import { russiaUid } from "@/constants";
+import { RUSSIA_UID } from "@/constants";
 import passportTypes from "../assets/data/passport-types.json";
 import countries from "../assets/data/citizenships.json";
 import clickOutside from "@/directives/clickOutside";
@@ -260,7 +260,7 @@ export default {
   },
   computed: {
     isRussianCitizen: function () {
-      return this.citizenship && this.citizenship.uid === russiaUid;
+      return this.citizenship && this.citizenship.uid === RUSSIA_UID;
     },
   },
   methods: {
